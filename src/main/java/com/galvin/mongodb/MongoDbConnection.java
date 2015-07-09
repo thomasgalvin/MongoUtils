@@ -85,7 +85,7 @@ public class MongoDbConnection
         return mongo;
     }
 
-    public DB getDB() throws UnknownHostException, MongoDbAuthenticationException
+    public DB getDB() throws UnknownHostException, LoginException
     {
         synchronized( MONGO_DB_LOCK )
         {
@@ -106,7 +106,7 @@ public class MongoDbConnection
                     else
                     {
                         db = null;
-                        throw new MongoDbAuthenticationException( host, port, dbName, user );
+                        throw new LoginException( host, port, dbName, user );
                     }
                 }
                 
@@ -116,7 +116,7 @@ public class MongoDbConnection
         return db;
     }
 
-    public DBCollection getCollection( String collectionName ) throws UnknownHostException, MongoDbAuthenticationException
+    public DBCollection getCollection( String collectionName ) throws UnknownHostException, LoginException
     {
         synchronized( USERS_COLLECTION_LOCK )
         {
