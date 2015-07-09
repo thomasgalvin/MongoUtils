@@ -7,13 +7,9 @@ import com.mongodb.DBObject;
 import com.mongodb.MongoClient;
 import java.net.UnknownHostException;
 import org.apache.commons.lang3.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class MongoDbConnection
 {
-
-    private final Logger logger = LoggerFactory.getLogger( MongoDbConnection.class );
     public static final int DEFAULT_MONGO_DB_PORT = 27017;
 
     private String host;
@@ -77,9 +73,7 @@ public class MongoDbConnection
         {
             if( mongo == null )
             {
-                logger.info( "Connecting to MongoDB running on " + host + ":" + port );
                 mongo = new MongoClient( host, port );
-                logger.info( "Connecting to MongoDB running on " + host + ":" + port + " sucessful." );
             }
         }
         return mongo;
@@ -91,26 +85,18 @@ public class MongoDbConnection
         {
             if( db == null )
             {
-                logger.info( "Connecting to " + host + ":" + port + ":" + dbName );
                 db = getMongoClient().getDB( dbName );
 
                 //authentication
                 if( !StringUtils.isEmpty( user ) && !StringUtils.isEmpty( password ) )
                 {
-                    logger.info( "Authenticating as: " + user );
                     boolean auth = db.authenticate( user, password.toCharArray() );
-                    if( auth )
-                    {
-                        logger.info( "Authenticatation successful." );
-                    }
-                    else
+                    if( !auth )
                     {
                         db = null;
                         throw new LoginException( host, port, dbName, user );
                     }
                 }
-                
-                logger.info( "Connecting to " + host + ":" + port + ":" + dbName + " sucessful." );
             }
         }
         return db;
@@ -128,10 +114,8 @@ public class MongoDbConnection
             }
             else
             {
-                logger.info( "Creating collection: " + collectionName );
                 DBObject collectionParameters = new BasicDBObject();
                 collection = getDB().createCollection( collectionName, collectionParameters );
-                logger.info( "Collection + " + collectionName + " created." );
             }
             return collection;
         }
