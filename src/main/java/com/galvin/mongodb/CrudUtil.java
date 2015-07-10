@@ -1,5 +1,6 @@
 package com.galvin.mongodb;
 
+import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.DBCollection;
 import com.mongodb.DBCursor;
@@ -8,22 +9,28 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.UUID;
 import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class CrudUtil<T extends HasUuid> {
+    private static final Logger logger = LoggerFactory.getLogger( CrudUtil.class );
+    
     private static final String CANONICAL_NAME = "_____canonical_class_name_____";
     public static final String UUID_FIELD = "uuid";
     private DBCollection collection;
-    private String targetClassName;
+    private String className;
+    private HashMap<String, CrudUtil> adapters = new HashMap();
 
     public CrudUtil( DBCollection collection, String className ) {
         this.collection = collection;
-        this.targetClassName = className;
+        this.className = className;
     }
 
     private BasicDBObject marshall( T target ) throws PersistenceException {
@@ -42,8 +49,17 @@ public class CrudUtil<T extends HasUuid> {
 
                     if( value != null ) {
                         String name = field.getName();
+                        String fieldClassName = value.getClass().getCanonicalName();
 
-                        if( isEnum( field ) ) {
+                        CrudUtil adapter = getAdapter( fieldClassName );
+                        
+                        if( adapter != null && value instanceof HasUuid ) {
+                            value = adapter.marshall( (HasUuid)value );
+                        }
+                        else if( value instanceof List ){
+                            value = marshall( (List)value );
+                        }
+                        else if( isEnum( field ) ) {
                             Enum enumValue = (Enum)value;
                             value = enumValue.ordinal();
                         }
@@ -58,6 +74,36 @@ public class CrudUtil<T extends HasUuid> {
         catch( IllegalAccessException ex ) {
             throw new PersistenceException( "Error in CrudUtil.marshall", ex );
         }
+    }
+    
+    private BasicDBList marshall( List list ) throws PersistenceException {
+        if( list != null ) {
+            BasicDBList result = new BasicDBList();
+            
+            for( Object value : list ) {
+                if( value != null ) {
+                    String objectClassName = value.getClass().getCanonicalName();
+                    CrudUtil adapter = getAdapter( objectClassName );
+
+                    if( adapter != null && value instanceof HasUuid ) {
+                        value = adapter.marshall( (HasUuid)value );
+                    }
+                    else if( value instanceof List ) {
+                        value = marshall( (List)value );
+                    }
+                    else if( value instanceof Enum ) {
+                        Enum enumValue = (Enum)value;
+                        value = enumValue.ordinal();
+                    }
+                    
+                    result.add( value );
+                }
+            }
+
+            return result;
+        }
+        
+        return null;
     }
 
     private void ensureUuid( T target ) {
@@ -86,7 +132,7 @@ public class CrudUtil<T extends HasUuid> {
     
     private T unmarshall( BasicDBObject record ) throws PersistenceException {
         try {
-            Class clazz = Class.forName( targetClassName );
+            Class clazz = Class.forName( className );
             T result = (T)clazz.newInstance();
             
             Set<Entry<String, Object>> entries = record.entrySet();
@@ -99,13 +145,21 @@ public class CrudUtil<T extends HasUuid> {
                     if( field != null ) {
                         Object value = entry.getValue();
                         if( value != null ) {
-                            field.setAccessible( true );
-
-                            if( isEnum( field ) ) {
+                            String fieldClassName = value.getClass().getCanonicalName();
+                            CrudUtil adapter = getAdapter( fieldClassName );
+                            
+                            if( adapter != null && value instanceof BasicDBObject ) {
+                                value = adapter.unmarshall( (BasicDBObject)value );
+                            }
+                            else if( value instanceof BasicDBList ){
+                                value = unmarshall( (BasicDBList)value );
+                            }
+                            else if( isEnum( field ) ) {
                                 int ordinal = (Integer)value;
                                 value = field.getType().getEnumConstants()[ordinal];
                             }
 
+                            field.setAccessible( true );
                             field.set( result, value );
                         }
                     }
@@ -120,6 +174,35 @@ public class CrudUtil<T extends HasUuid> {
                NoSuchFieldException ex ) {
             throw new PersistenceException( "Error in CrudUtil.unmarshall", ex );
         }
+    }
+    
+    private List unmarshall( BasicDBList list ) throws PersistenceException {
+        List result = new ArrayList();
+        
+        if( list != null ){
+            for( Object value : list ){
+                if( value != null ){
+                    String objectClassName = value.getClass().getCanonicalName();
+                    if( value instanceof BasicDBObject ){
+                        BasicDBObject tmp = (BasicDBObject)value;
+                        objectClassName = tmp.getString( CANONICAL_NAME );
+                    }
+                    
+                    CrudUtil adapter = getAdapter( objectClassName );
+                    
+                    if( adapter != null && value instanceof BasicDBObject ) {
+                        value = adapter.unmarshall( (BasicDBObject)value );
+                    }
+                    else if( value instanceof BasicDBList ) {
+                        value = unmarshall( (BasicDBList)value );
+                    }
+                    
+                    result.add( value );
+                }
+            }
+        }
+        
+        return result;
     }
 
     public String store( T target ) throws PersistenceException {
@@ -168,29 +251,10 @@ public class CrudUtil<T extends HasUuid> {
         return retrieveAll( uuid, UUID_FIELD );
     }
 
-    /**
-     * Retrieves a list of Ts, based on UUID. If a record is not found for a
-     * particular UUID, it will be "skipped", but any other matches will still
-     * be returned.
-     * <p>
-     * @param uuids the uuids
-     * @return a list of matching Ts
-     * @throws PersistenceException on error
-     */
     public List<T> retrieve( List<String> uuids ) throws PersistenceException {
         return retrieve( uuids, UUID_FIELD );
     }
 
-    /**
-     * Retrieves a list of Ts, based on UUID. If a record is not found for a
-     * particular UUID, it will be "skipped", but any other matches will still
-     * be returned.
-     * <p>
-     * @param uuids     the uuids
-     * @param fieldName the name of the UUID field in MongoDB
-     * @return a list of matching Ts
-     * @throws PersistenceException on error
-     */
     public List<T> retrieve( List<String> uuids, String fieldName ) throws PersistenceException {
         BasicDBObject query = createUuidQuery( uuids, fieldName );
         DBCursor cursor = getCollection().find( query );
@@ -222,7 +286,7 @@ public class CrudUtil<T extends HasUuid> {
     }
 
     public List<T> retrieveAll() throws PersistenceException {
-        DBCursor cursor = getCollection().find( createTypeQuery( targetClassName ) );
+        DBCursor cursor = getCollection().find( createTypeQuery( className ) );
         List<T> result = new ArrayList( cursor.size() );
 
         while( cursor.hasNext() ) {
@@ -251,25 +315,10 @@ public class CrudUtil<T extends HasUuid> {
         return cursor.hasNext();
     }
 
-    /**
-     * Deletes all records matching this uuid.
-     * <p>
-     * @param uuid the uuid to delete
-     * @return true if matching records were found, false otherwise
-     * @throws PersistenceException on error
-     */
     public boolean delete( String uuid ) throws PersistenceException {
         return delete( uuid, UUID_FIELD );
     }
 
-    /**
-     * Deletes all records matching this uuid.
-     * <p>
-     * @param uuid      the uuid to delete
-     * @param fieldName the uuid field name
-     * @return true if matching records were found, false otherwise
-     * @throws PersistenceException on error
-     */
     public boolean delete( String uuid, String fieldName ) throws PersistenceException {
         return delete( Arrays.asList( uuid ), fieldName );
     }
@@ -364,7 +413,32 @@ public class CrudUtil<T extends HasUuid> {
         return query;
     }
 
-    private DBCollection getCollection(){
+    ////////////////////
+    // public methods //
+    ////////////////////
+    
+    public DBCollection getCollection(){
         return collection;
+    }
+    
+    public String getClassName() {
+        return className;
+    }
+    
+    public void register( String className, CrudUtil crudUtil ) {
+        adapters.put( className, crudUtil );
+    }
+    
+    public void unregister( String className ){
+        adapters.remove( className );
+    }
+    
+    private CrudUtil getAdapter(String className ){
+        if( getClassName().equals( className ) ){
+            return this;
+        }
+        else {
+            return adapters.get( className );
+        }
     }
 }
