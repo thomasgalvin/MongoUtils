@@ -27,6 +27,7 @@ public class CrudUtil<T extends HasUuid> {
     private DBCollection collection;
     private String className;
     private HashMap<String, CrudUtil> adapters = new HashMap();
+    private List<String> excludedFieldNames = new ArrayList();
 
     public CrudUtil( DBCollection collection, String className ) {
         this.collection = collection;
@@ -49,8 +50,8 @@ public class CrudUtil<T extends HasUuid> {
 
                     if( value != null ) {
                         String name = field.getName();
-                        String fieldClassName = value.getClass().getCanonicalName();
 
+                        String fieldClassName = value.getClass().getCanonicalName();
                         CrudUtil adapter = getAdapter( fieldClassName );
                         
                         if( adapter != null && value instanceof HasUuid ) {
@@ -113,9 +114,17 @@ public class CrudUtil<T extends HasUuid> {
     }
     
     private boolean recordField( Field field ){
-        return !Modifier.isTransient( field.getModifiers() );
+        if( Modifier.isTransient( field.getModifiers() ) ) {
+            return false;
+        }
+
+        if( excludedFieldNames.contains( field.getName() ) ) {
+            return false;
+        }
+
+        return true;
     }
-    
+
     private boolean setField( String name ){
         return !CANONICAL_NAME.equals( name ) &&
                !name.startsWith( "_" );
@@ -423,6 +432,10 @@ public class CrudUtil<T extends HasUuid> {
     
     public String getClassName() {
         return className;
+    }
+    
+    public void excludeField( String field ) {
+        excludedFieldNames.add( field );
     }
     
     public void register( String className, CrudUtil crudUtil ) {
