@@ -1,5 +1,6 @@
 package com.galvin.mongodb;
 
+import com.galvin.db.PersistenceException;
 import com.mongodb.DBCollection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

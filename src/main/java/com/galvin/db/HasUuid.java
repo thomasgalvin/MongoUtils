@@ -1,4 +1,4 @@
-package com.galvin.mongodb;
+package com.galvin.db;
 
 public interface HasUuid
 {

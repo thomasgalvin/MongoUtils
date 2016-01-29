@@ -1,5 +1,7 @@
 package com.galvin.mongodb;
 
+import com.galvin.db.PersistenceException;
+import com.galvin.db.HasUuid;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.DBCollection;

@@ -1,5 +1,6 @@
 package com.galvin.mongodb;
 
+import com.galvin.db.DatabaseLoginException;
 import com.mongodb.BasicDBObject;
 import com.mongodb.DB;
 import com.mongodb.DBCollection;
@@ -79,7 +80,7 @@ public class MongoDbConnection
         return mongo;
     }
 
-    public DB getDB() throws UnknownHostException, LoginException
+    public DB getDB() throws UnknownHostException, DatabaseLoginException
     {
         synchronized( MONGO_DB_LOCK )
         {
@@ -94,7 +95,7 @@ public class MongoDbConnection
                     if( !auth )
                     {
                         db = null;
-                        throw new LoginException( host, port, dbName, user );
+                        throw new DatabaseLoginException( host, port, dbName, user );
                     }
                 }
             }
@@ -102,7 +103,7 @@ public class MongoDbConnection
         return db;
     }
 
-    public DBCollection getCollection( String collectionName ) throws UnknownHostException, LoginException
+    public DBCollection getCollection( String collectionName ) throws UnknownHostException, DatabaseLoginException
     {
         synchronized( USERS_COLLECTION_LOCK )
         {

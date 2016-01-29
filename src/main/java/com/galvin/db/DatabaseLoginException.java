@@ -1,6 +1,6 @@
-package com.galvin.mongodb;
+package com.galvin.db;
 
-public class LoginException
+public class DatabaseLoginException
 extends RuntimeException
 {
     private String host;
@@ -12,26 +12,26 @@ extends RuntimeException
     // constructors //
     //////////////////
     
-    public LoginException()
+    public DatabaseLoginException()
     {
     }
 
-    public LoginException( String message )
+    public DatabaseLoginException( String message )
     {
         super( message );
     }
 
-    public LoginException( String message, Throwable cause )
+    public DatabaseLoginException( String message, Throwable cause )
     {
         super( message, cause );
     }
 
-    public LoginException( Throwable cause )
+    public DatabaseLoginException( Throwable cause )
     {
         super( cause );
     }
 
-    public LoginException( String host, int port, String dbName, String user )
+    public DatabaseLoginException( String host, int port, String dbName, String user )
     {
         super( createErrorMssage( host, port, dbName, user ) );
         this.host = host;
@@ -40,7 +40,7 @@ extends RuntimeException
         this.user = user;
     }
 
-    public LoginException( String host, int port, String dbName, String user, Throwable cause )
+    public DatabaseLoginException( String host, int port, String dbName, String user, Throwable cause )
     {
         super( createErrorMssage( host, port, dbName, user ), cause );
         this.host = host;
